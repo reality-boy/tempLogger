@@ -1,3 +1,5 @@
+// https://learn.adafruit.com/adafruit-data-logger-shield?view=all
+
 #include <SPI.h>
 #include <SD.h>
 
@@ -12,22 +14,25 @@ public:
     //----------------
     // init local variables
     
-    //logFile = NULL;
+    //logFile = false;
     syncTime = 0;
 
     //----------------
     // setup date/time
 
     //Wire.begin();  
-    if(!rtc.begin()) 
+    if(rtc.begin())
+    {
+      if (!rtc.isrunning()) 
+      {
+        Serial.println("Real time clock is NOT running!");
+        // following line sets the RTC to the date & time this sketch was compiled
+        // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+      }
+    }
+    else
       Serial.println("Real time clock failed to initialize!");
   
-    if (! rtc.isrunning()) 
-    {
-      Serial.println("Real time clock is NOT running!");
-      // following line sets the RTC to the date & time this sketch was compiled
-      // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    }
 
     //----------------
     // setup and open file
@@ -43,18 +48,22 @@ public:
     unsigned long ms = millis();
 
     // log milliseconds since starting
-    logFile.print(ms / 1000);
+    if(logFile)
+      logFile.print(ms / 1000);
     Serial.print(ms / 1000);
 
     DateTime now = rtc.now();
 
     // log date
-    logFile.print(",");
-    logFile.print(now.year(), DEC);
-    logFile.print("/");
-    logFile.print(now.month(), DEC);
-    logFile.print("/");
-    logFile.print(now.day(), DEC);
+    if(logFile)
+    {
+      logFile.print(",");
+      logFile.print(now.year(), DEC);
+      logFile.print("/");
+      logFile.print(now.month(), DEC);
+      logFile.print("/");
+      logFile.print(now.day(), DEC);
+    }
 
     Serial.print(",");
     Serial.print(now.year(), DEC);
@@ -64,12 +73,15 @@ public:
     Serial.print(now.day(), DEC);
 
     // log time
-    logFile.print(",");
-    logFile.print(now.hour(), DEC);
-    logFile.print(":");
-    logFile.print(now.minute(), DEC);
-    logFile.print(":");
-    logFile.print(now.second(), DEC);
+    if(logFile)
+    {
+      logFile.print(",");
+      logFile.print(now.hour(), DEC);
+      logFile.print(":");
+      logFile.print(now.minute(), DEC);
+      logFile.print(":");
+      logFile.print(now.second(), DEC);
+    }
 
     Serial.print(",");
     Serial.print(now.hour(), DEC);
@@ -81,8 +93,11 @@ public:
   
   void addFloat(float f)
   {
-    logFile.print(",");
-    logFile.print(f);
+    if(logFile)
+    {
+      logFile.print(",");
+      logFile.print(f);
+    }
 
     Serial.print(",");
     Serial.print(f);
@@ -90,8 +105,11 @@ public:
   
   void addInt(int i)
   {
-    logFile.print(",");
-    logFile.print(i);
+    if(logFile)
+    {
+      logFile.print(",");
+      logFile.print(i);
+    }
 
     Serial.print(",");
     Serial.print(i);
@@ -99,10 +117,13 @@ public:
 
   void addString(const char *s, int i=-1)
   {
-    logFile.print(",");
-    logFile.print(s);
-    if(i >= 0)
-      logFile.print(i);
+    if(logFile)
+    {
+      logFile.print(",");
+      logFile.print(s);
+      if(i >= 0)
+        logFile.print(i);
+    }
 
     Serial.print(",");
     Serial.print(s);
@@ -112,7 +133,8 @@ public:
 
   void endLine()
   {
-    logFile.println();
+    if(logFile)
+      logFile.println();
 
     Serial.println();
 
@@ -122,7 +144,8 @@ public:
     if(millis() > syncTime)
     {
       syncTime = millis() + syncInterval;
-      logFile.flush();
+      if(logFile)
+        logFile.flush();
     }
   }
 
@@ -144,21 +167,16 @@ protected:
     }
   
     // log file name
-    if(!logFile)
-    {
-      Serial.print("Error: could not create file");
-      Serial.println(filename);
-    }
-    else
-    {
+    if(logFile)
       Serial.print("Logging to: ");
-      Serial.println(filename);
+    else
+      Serial.print("Error: could not create file: ");
+    Serial.println(filename);
 
-      // fill in beginning of header
+    // fill in beginning of header
+    if(logFile)
       logFile.write("sec,date,time_HMS");
-
-      Serial.write("sec,date,time_HMS");
-    }
+    Serial.write("sec,date,time_HMS");
   }
 
   RTC_DS1307 rtc;

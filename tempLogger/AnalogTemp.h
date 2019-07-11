@@ -34,7 +34,7 @@ public:
     for(int j=0; j<numSamples; j++)
     {
       val += analogRead(tpin);
-      delay(10);
+      //delay(1);  // 10
     }
     val /= numSamples;
     
@@ -44,10 +44,10 @@ public:
   float convertTempC(float Vo)
   {
     // temp conversion units
-    int ROther_ohm = 10000; // resistance of other resistor
-    int RtNom_ohm = 10000; // resistance at 25 C
-    int tmpNom_C = 25; // 25 C
-    int BCoef = 3950; // beta coeficient of thermistor
+    const static int ROther_ohm = 10000; // resistance of other resistor
+    const static int RtNom_ohm = 10000; // resistance at 25 C
+    const static int tmpNom_C = 25; // 25 C
+    const static int BCoef = 3950; // beta coeficient of thermistor
     
     // convert to resistance
     // Vs is source voltage, Vo is output voltage

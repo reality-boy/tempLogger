@@ -1,34 +1,52 @@
-// uncomment to use lux over uv sensor
-#define USE_LUX
 
-// how often to log data, in milliseconds
-#define LOG_INTERVAL (1 * 60UL * 1000UL) // log once a minute
 
-#include "DataLogger.h"
+// how often to log data, in minutes
+const float logMinutes = 1.0f; // log once a minute
+
+// log temps as read, or apply magnitude and offset correctoin
+const bool applyCorrection = true;
+
+// uncomment to use various sensors
+#define USE_DIGITAL
+#define USE_ANALOG
+//#define USE_LUX
+//#define USE_UV
+
+
+
+
+#ifdef USE_ANALOG
 #include "AnalogTemp.h"
-#include "DigitalTemp.h"
-
-#ifdef USE_LUX
-# include "LuxLight.h"
-#else
-# include "UVLight.h"
+const int analogTempCount = 4;
+const float aTempMag[analogTempCount] = { 1.051f,  1.046f,  1.058f,  1.053f };
+const float aTempOff[analogTempCount] = {-1.462f, -2.042f, -2.200f, -2.111f };
+AnalogTemp analogTemp[analogTempCount];
+const bool logRaw = false; // enable to log raw DAC values
 #endif
 
-DataLogger logger;
-
-const int ANALOG_TEMP_COUNT = 4;
-AnalogTemp analogTemp[ANALOG_TEMP_COUNT];
-float aTempMag[ANALOG_TEMP_COUNT] = {1.0961f, 1.0979f,  1.0972f,  1.0875f};
-float aTempOff[ANALOG_TEMP_COUNT] = {-0.9220f, -1.5225f, -1.3282f, -1.5116f};
-
-const int DIGITAL_TEMP_COUNT = 1; //8;
-DigitalTemp digitalTemp[DIGITAL_TEMP_COUNT];
+#ifdef USE_DIGITAL
+#include "DigitalTemp.h"
+const int digitalTempCount = 7; //8;
+const float dTempMag[digitalTempCount] = { 1.000f,  1.001f,  1.014f,  1.009f,  1.009f,  1.015f,  1.007f };
+const float dTempOff[digitalTempCount] = { 0.000f, -0.222f, -0.447f, -0.538f, -0.601f, -0.750f, -0.450f };
+DigitalTemp digitalTemp[digitalTempCount];
+#endif
 
 #ifdef USE_LUX
+#include "LuxLight.h"
 LuxLight luxLight;
-#else
+#endif
+
+#ifdef USE_UV
+#include "UVLight.h"
 UVLight uvLight;
 #endif
+
+#include "DataLogger.h"
+const unsigned long logMills = (unsigned long)(logMinutes * 60UL * 1000UL);
+DataLogger logger;
+
+
 
 void setup() 
 {
@@ -36,25 +54,41 @@ void setup()
 
   logger.init();
 
-  for(int i=0; i<ANALOG_TEMP_COUNT; i++)
+#ifdef USE_ANALOG
+  for(int i=0; i<analogTempCount; i++)
   {
-    analogTemp[i].init(i, aTempMag[i], aTempOff[i]);
-    logger.addString("aRaw_", i);
-    logger.addString("aTempC_", i);
-  }
+    if(applyCorrection)
+      analogTemp[i].init(i, aTempMag[i], aTempOff[i]);
+    else
+      analogTemp[i].init(i);
 
-  for(int i=0; i<DIGITAL_TEMP_COUNT; i++)
+    if(logRaw)
+      logger.addString("aRaw_", i);
+    else
+      logger.addString("aTempC_", i);
+  }
+#endif
+
+#ifdef USE_DIGITAL
+  for(int i=0; i<digitalTempCount; i++)
   {
-    digitalTemp[i].init(i);
+    if(applyCorrection)
+      digitalTemp[i].init(i, dTempMag[i], dTempOff[i]);
+    else
+      digitalTemp[i].init(i);
+
     logger.addString("dTempC_", i);
   }
+#endif
 
 #ifdef USE_LUX
   luxLight.init();
   logger.addString("luxLux");
   logger.addString("luxWhite");
   logger.addString("luxALS");
-#else
+#endif
+
+#ifdef USE_UV
   uvLight.init();
   logger.addString("uvUVA");
   logger.addString("uvUVB");
@@ -64,28 +98,38 @@ void setup()
   logger.endLine();
 }
 
+
+
 void loop() 
 {
   // calculate time to next log
-  unsigned long logNext = millis() + LOG_INTERVAL;
+  unsigned long logNext = millis() + logMills;
   
   logger.beginLine();
-  
-  for(int i=0; i<ANALOG_TEMP_COUNT; i++)
+
+#ifdef USE_ANALOG
+  for(int i=0; i<analogTempCount; i++)
   {
     int r = analogTemp[i].readTempRaw();
-    logger.addInt(r);
-    logger.addFloat(analogTemp[i].convertTempC(r));
+    if(logRaw)
+      logger.addInt(r);
+    else
+      logger.addFloat(analogTemp[i].convertTempC(r));
   }
+#endif
 
-  for(int i=0; i<DIGITAL_TEMP_COUNT; i++)
+#ifdef USE_DIGITAL
+  for(int i=0; i<digitalTempCount; i++)
     logger.addFloat(digitalTemp[i].readTempC());
+#endif
 
 #ifdef USE_LUX
   logger.addFloat(luxLight.readLux());
   logger.addFloat(luxLight.readWhite());
   logger.addInt(luxLight.readALS());
-#else
+#endif
+
+#ifdef USE_UV
   logger.addFloat(uvLight.readUVA());
   logger.addFloat(uvLight.readUVB());
   logger.addFloat(uvLight.readUVI());
@@ -99,8 +143,3 @@ void loop()
   if(logDelay > 0)
     delay(logDelay);
 }
-
-
-
-
-//----------------
